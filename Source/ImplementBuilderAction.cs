@@ -42,7 +42,7 @@ namespace GenerateBuilder.Source
             var builderType = string.Format("{0}Builder", classDeclaration.DeclaredName);
 
             var code = new StringBuilder(string.Format("public class {0} {{", builderType));
-
+            code.AppendLine();
             var cls = classDeclaration.DeclaredElement as IClass;
             if (cls == null)
             {
@@ -53,15 +53,42 @@ namespace GenerateBuilder.Source
             if (ctor == null)
                 return;
 
+            var fields = new StringBuilder();
+            var methods = new StringBuilder();
+
             foreach (var parameter in ctor.Parameters)
             {
-                code.AppendLine("private {0} _{1};", parameter.Type.GetPresentableName(cls.PresentationLanguage), parameter.ShortName);
-                code.AppendLine("public {2} With{1}({0} value){{ ", parameter.Type.GetPresentableName(cls.PresentationLanguage), parameter.ShortName.Capitalize(), builderType);
-                code.AppendLine(" _{0} = value;", parameter.ShortName);
-                code.AppendLine("return this;");
-                code.AppendLine("}");
-                code.AppendLine();
+                var typePresentableName = parameter.Type.GetPresentableName(cls.PresentationLanguage);
+                var shortName = parameter.ShortName;
+                var capitalizedShortName = shortName.Capitalize();
+
+                fields.AppendLine("private {0} _{1};", typePresentableName, shortName);
+                methods.AppendLine("public {2} With{1}({0} value){{ ", typePresentableName, capitalizedShortName, builderType);
+                methods.AppendLine(" _{0} = value;", shortName);
+                methods.AppendLine("return this;");
+                methods.AppendLine("}");
+                methods.AppendLine();
+
+                if (parameter.Type.IsGenericIEnumerable())
+                {
+                    var genericParameter = typePresentableName.Split(new[] { '<', '>' })[1];
+                    var listType = string.Format("List<{0}>", genericParameter);
+
+                    methods.AppendLine("public {0} Add{1}({2} value){{", builderType, NounUtil.GetSingular(capitalizedShortName), genericParameter);
+                    methods.AppendLine(" if(_{0} == null){{", shortName);
+                    methods.AppendLine("  _{0} = new {1}();", shortName, listType);
+                    methods.AppendLine(" }");
+                    methods.AppendLine(" (({0})_{1}).Add(value);", listType, shortName);
+                    methods.AppendLine(" return this;");
+                    methods.AppendLine("}");
+                    methods.AppendLine();
+                }
+
             }
+
+            code.Append(fields);
+            code.Append(methods);
+
 
             code.AppendLine("public {0} Build(){{", classDeclaration.DeclaredName);
             code.AppendFormat("return new  {0}(", classDeclaration.DeclaredName);
