@@ -73,12 +73,17 @@ namespace GenerateBuilder.Source
                 {
                     var genericParameter = typePresentableName.Split(new[] { '<', '>' })[1];
                     var listType = string.Format("List<{0}>", genericParameter);
+                    var singularName = NounUtil.GetSingular(capitalizedShortName);
 
-                    methods.AppendLine("public {0} Add{1}({2} value){{", builderType, NounUtil.GetSingular(capitalizedShortName), genericParameter);
+                    methods.AppendLine("public {0} Add{1}({2} value){{", builderType, singularName, genericParameter);
                     methods.AppendLine(" if(_{0} == null){{", shortName);
                     methods.AppendLine("  _{0} = new {1}();", shortName, listType);
                     methods.AppendLine(" }");
-                    methods.AppendLine(" (({0})_{1}).Add(value);", listType, shortName);
+                    methods.AppendLine("  var collection = _{0} as ICollection<{1}>;", shortName, genericParameter);
+                    methods.AppendLine("  if (collection == null || collection.IsReadOnly){");
+                    methods.AppendLine("     throw new InvalidOperationException(\"Add{0}() method cannot be used with this collection type\");", singularName);
+                    methods.AppendLine("  }");
+                    methods.AppendLine(" collection.Add(value);");
                     methods.AppendLine(" return this;");
                     methods.AppendLine("}");
                     methods.AppendLine();
@@ -124,7 +129,7 @@ namespace GenerateBuilder.Source
     }
 
 
-    public abstract class CSharpOneItemContextAction : BulbItemImpl, IContextAction
+    public abstract class CSharpOneItemContextAction :ContextActionBase
     {
         protected readonly ICSharpContextActionDataProvider Provider;
 
@@ -133,11 +138,11 @@ namespace GenerateBuilder.Source
             Provider = provider;
         }
 
-        public abstract bool IsAvailable(IUserDataHolder cache);
+        //public abstract bool IsAvailable(IUserDataHolder cache);
 
-        public new IBulbItem[] Items
+        public IBulbAction[] Items
         {
-            get { return new[] { this }; }
+            get { return new IBulbAction[] { this }; }
         }
     }
 }
